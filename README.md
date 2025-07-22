@@ -92,9 +92,6 @@ Untuk melakukan uji coba tanpa mengirim data dari perangkat eksternal, Anda bisa
 │   ├── scaler_updated_waveletss.pkl
 │   └── pca_model_updated_waveletss.pkl
 │
-├── templates/
-│   └── index.html
-│
 ├── app.py              # Kode utama aplikasi Flask
 ├── requirements.txt    # Daftar library yang dibutuhkan
 └── README.md           # File ini
