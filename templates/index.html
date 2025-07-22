@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Road Condition Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+</head>
+<body>
+    <header class="main-header">
+        <h1>Road Condition Monitor</h1>
+    </header>
+
+    <div class="main-container">
+        <!-- Kolom Kiri untuk Chart -->
+        <div class="chart-column">
+            <div class="chart-container">
+                <canvas id="vibrationChart"></canvas>
+            </div>
+            <!-- Removed discrete chart containers as they're no longer needed -->
+        </div>
+
+        <!-- Kolom Kanan untuk Map dan Tabel -->
+        <div class="right-column">
+            <div class="map-panel">
+                <div id="map" style="height: 100%;"></div>
+            </div>
+            <div class="history-panel">
+                <h3>History Data Chunks</h3>
+                <div class="table-container">
+                    <table id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>Chunk</th>
+                                <th>Timestamp</th>
+                                <th>Status</th>
+                                <th>Location</th>
+                                <th>Slope (°)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Data akan diisi oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BUFFER_SIZE   = 1000;  // total panjang array buat di chart nya
+        const CHUNK_SIZE    = 50;    // panjang array 1 chunk dari data.vibration
+        let vibrationBuffer = new Array(BUFFER_SIZE).fill(null); //buat buffer chart yang panjangnya 1000
+
+        const map = L.map('map').setView([-6.200, 106.950], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        const polyline = L.polyline([], {color: '#1f77b4'}).addTo(map);
+        const alertMarkers = L.layerGroup().addTo(map);
+        let currentPositionMarker = null;
+
+        // Inisialisasi Chart Getaran
+        const vibrationCtx = document.getElementById('vibrationChart').getContext('2d');
+        const vibrationChart = new Chart(vibrationCtx, {
+            type: 'line',
+            data: {
+                // ini aku inisialisasi si grafiknya biar kosong dulu
+                labels: Array.from({length: BUFFER_SIZE}, (_, i) => i + 1),
+                datasets: [{
+                    label: 'Vibration Amplitude',
+                    data: [...vibrationBuffer],
+                    borderColor: '#1f77b4',
+                    pointRadius: 0,
+                    borderWidth: 1,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                animation: { duration: 0 },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: { title: { display: true, text: 'Amplitude (m/s²)' } }
+                }
+            }
+        });
+        // SSE untuk Vibration Data
+        const eventSource = new EventSource('/stream');
+        eventSource.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            updateDashboard(data);
+        };
+
+        // MQTT hanya untuk GPS
+        // const mqttClient = new Paho.MQTT.Client(
+        //     "mqtt.eclipseprojects.io",
+        //     80,
+        //     "/mqtt",
+        //     "gps-client-" + Math.random().toString(16).substr(2, 8)
+        // );
+
+        // mqttClient.onMessageArrived = message => {
+        //     if(message.destinationName === 'sensor/data/gps') {
+        //         const gpsData = JSON.parse(message.payloadString);
+        //         updateRealTimeGPS(gpsData);
+        //     }
+        // };
+
+        // mqttClient.connect({
+        //     onSuccess: () => {
+        //         console.log("MQTT Connected for GPS");
+        //         mqttClient.subscribe("sensor/data/gps");
+        //     },
+        //     onFailure: err => console.error("MQTT Error:", err)
+        // });
+
+        function pushChunk(rawArray) {
+            // 1) ini fungsi buat ngebuang chunk paling kiri kalo udah penuh (terlama)
+            vibrationBuffer = vibrationBuffer.slice(CHUNK_SIZE);
+            // 2) ini buat nge-concat atau ngegabungin biar nanti data baru ada di sebelah kanan terus
+            vibrationBuffer = vibrationBuffer.concat(rawArray);
+        }
+
+        // Fungsi Update Dashboard
+        function updateDashboard(data) {
+            // 1) Ambil chunk vibration yang benar
+            const vibArr = data.vibration_data;    // ini ambil array dari data.vibration_data yang panjangnya 50 data
+            
+            // 2) cuma buat validasi aja, kalo arraynya ada dan panjangnya 50, kalo valid, push ke buffer
+            // 3) kalo udah di push, update chart
+            // 4) update status chart
+
+            if (Array.isArray(vibArr) && vibArr.length === CHUNK_SIZE) {
+                pushChunk(vibArr);
+                updateVibrationChart(data.status);
+            }
+
+            // 5) update posisi marker
+            updatePositionMarker(data);
+
+            // 6) update tabel
+            updateDataTable(data);
+        }
+
+        function updateVibrationChart(status) {
+            // 1) ini buat nulis ulang dataset dengan buffer terbaru
+            vibrationChart.data.datasets[0].data = vibrationBuffer;
+            // set warna border berdasarkan status
+            vibrationChart.data.datasets[0].borderColor =
+                status === 'ML_ERROR'          ? '#bbbbbb' :
+                status === 'SEVERE UNDULATION' ? '#ff4444' :
+                status === 'UNDULATING'        ? '#ffa500' :
+                                                '#1f77b4';
+            vibrationChart.update();
+        }
+
+        function updatePositionMarker(data) {
+            const [lat, lon] = data.location.split(', ').map(parseFloat);
+
+            // 1) Extend the polyline route every time
+            polyline.addLatLng([lat, lon]);
+
+            // 2) Update the moving "current" marker
+            if (currentPositionMarker) {
+                map.removeLayer(currentPositionMarker);
+            }
+            currentPositionMarker = L.marker([lat, lon], {
+                icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149060.png',
+                    iconSize: [32, 32]
+                })
+            }).addTo(map);
+
+            // 3) For UNDULATING / SEVERE UNDULATION, add a persistent alert marker
+            if (data.status === 'UNDULATING' || data.status === 'SEVERE UNDULATION') {
+                const iconUrl = data.status === 'SEVERE UNDULATION'
+                    ? 'https://cdn-icons-png.flaticon.com/512/252/252035.png'  // contoh: red alert icon
+                    : 'https://cdn-icons-png.flaticon.com/512/252/252022.png'; // contoh: orange warning icon
+
+                L.marker([lat, lon], {
+                    icon: L.icon({ iconUrl, iconSize: [24, 24] })
+                })
+                .bindPopup(`<b>${data.status}</b><br>${new Date(data.timestamp).toLocaleString()}`)
+                .addTo(alertMarkers);
+            }
+
+            // 4) Keep the map centered on current position
+            map.setView([lat, lon], map.getZoom());
+        }
+
+        function updateDataTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            const row = document.createElement('tr');
+            const rowColor = data.status === 'ML_ERROR' ? '#f2dede' : '';
+            row.style.backgroundColor = rowColor;
+
+            let slopeStr = '-';
+            if (typeof data.slope_deg === 'number' && !isNaN(data.slope_deg)) {
+                slopeStr = data.slope_deg.toFixed(2);
+            }
+            
+            row.innerHTML = `
+                <td>${data.chunk_number.toString().padStart(4, '0')}</td>
+                <td>${new Date(data.timestamp).toLocaleString('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    hour12: false
+                })} WIB</td>
+                <td style="color: ${data.status === 'SEVERE UNDULATION' ? '#ff4444' : '#27ae60'}">
+                    ${data.status}
+                </td>
+                <td>${data.location}</td>
+                <td>${slopeStr}</td>
+            `;
+
+            if(tableBody.children.length >= 50) {
+                tableBody.lastElementChild.remove();
+            }
+            tableBody.prepend(row);
+        }
+    </script>
+</body>
+</html>

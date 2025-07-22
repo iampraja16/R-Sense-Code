@@ -1,0 +1,174 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.main-header {
+    background-color: #1f77b4;
+    color: white;
+    padding: 5px 10px;
+    text-align: center;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    width: var(--chart-width, 96%);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    align-items: center; /* Vertikal tengah */
+    justify-content: center; /* Horizontal tengah */
+    margin-left: 20px;
+}
+
+.main-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.chart-container {
+    height: 60vh;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    width: var(--chart-width, 100%);
+    height: var(--chart-height, 500px); /* Increased height since we removed other charts */
+    margin: 10px auto;
+    display: flex;
+    justify-content: var(--chart-align, center);
+    align-items: center;
+}
+
+.status-panel {
+    display: flex;
+    justify-content: space-around;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    align-items: center;
+    width: var(--chart-width, 79.6%);
+    margin: 10px auto;
+}
+
+.status-item {
+    text-align: center;
+}
+
+label {
+    display: block;
+    color: #666;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+span {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #333;
+}
+
+.main-container {
+    display: flex;
+    height: calc(100vh - 100px); /* Total height minus header */
+    gap: 20px;
+    padding: 0 20px;
+    overflow: hidden;
+}
+
+.chart-column {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+.history-panel {
+    flex: 1;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: 80vh;
+}
+
+.history-panel h3 {
+    margin: 0 0 15px 0;
+    color: #1f77b4;
+    font-size: 1.2em;
+    font-weight: bold;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #eee;
+    text-align: center; 
+    width: 100%;
+}
+
+.table-container {
+    flex: 1;
+    overflow-y: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Segoe UI', sans-serif;
+    word-wrap: break-word;
+}
+
+th, td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    white-space: normal; /* Prevent too long text */
+}
+
+th {
+    background-color: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.status-panel, .container {
+    display: none;
+}
+
+/* Add at the end of CSS */
+.right-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow: hidden;
+}
+
+.map-panel {
+    flex: 1;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+    min-height: 40%;
+    max-height: 60%;
+}
+
+.history-panel {
+    flex: 1;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
